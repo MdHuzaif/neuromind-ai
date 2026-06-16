@@ -1,12 +1,31 @@
+# Core UI & Data Processing
 streamlit>=1.58.0
-pypdf==5.1.0
+pandas==2.2.3
+python-dotenv==1.0.1
+
+# LangChain Ecosystem (Updated for compatibility)
 langchain==0.3.13
 langchain-community==0.3.13
+langchain-core>=0.3.0
+langchain-text-splitters>=0.3.0
+
+# LLM Integrations
+langchain-groq>=0.2.0  # Required for ChatGroq integration
+groq==0.13.1
 langchain-google-genai==2.0.7
+google-generativeai==0.8.3
+
+# Vector Store & Embeddings
 faiss-cpu==1.9.0.post1
 sentence-transformers==3.3.1
-groq==0.13.1
-google-generativeai==0.8.3
-python-dotenv==1.0.1
+
+# PDF Parsing & OCR (CRITICAL for NeuroMind AI)
+pymupdf>=1.24.0      # Replaces pypdf for better text extraction
+unstructured>=0.16.0 # For OCR fallback on image-based PDFs
+pypdf==5.1.0         # Kept as backup parser
+
+# Export & Reporting
 fpdf2==2.8.2
-pandas==2.2.3
+
+# Utilities
+tiktoken>=0.8.0
