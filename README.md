@@ -1,3 +1,16 @@
+---
+title: NeuroMind AI
+emoji: 🧠
+colorFrom: purple
+colorTo: blue
+sdk: streamlit
+sdk_version: 1.58.0
+app_file: app.py
+pinned: true
+---
+
+# 🧠 NeuroMind AI
+
 # 🤖 Universal PDF RAG Chatbot
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
