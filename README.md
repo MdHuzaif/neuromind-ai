@@ -1,4 +1,4 @@
-# 🧠 NeuroMind AI - Agent for Neuroscience
+# 🧠 NeuroMind AI - Autonomous Agent for Neuroscience
 
 <div align="center">
 
