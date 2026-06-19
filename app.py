@@ -9,6 +9,7 @@ import html
 from pathlib import Path
 from typing import List
 import textwrap
+import neuron_simulator
 
 # Logging Setup
 logging.basicConfig(
@@ -77,6 +78,42 @@ GROQ_MODELS = [
     "llama3-70b-8192",             # Original Llama 3 70B
     "llama3-8b-8192",              # Original Llama 3 8B
 ]
+
+# Pyodide Integration for Browser-Based Python Execution
+st.markdown("""
+<script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+<script>
+async function runPythonCode(code) {
+    let pyodide = await loadPyodide();
+    await pyodide.loadPackage(["numpy", "matplotlib"]);
+    
+    // Capture matplotlib output
+    pyodide.runPython(`
+        import matplotlib
+        matplotlib.use('agg')
+        import matplotlib.pyplot as plt
+        import io
+        import base64
+        
+        def show_plot():
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            img_str = base64.b64encode(buf.read()).decode('utf-8')
+            return img_str
+    `);
+    
+    // Run user code
+    try {
+        await pyodide.runPythonAsync(code);
+        let plot_data = pyodide.runPython("show_plot()");
+        return plot_data;
+    } catch (error) {
+        return "Error: " + error.message;
+    }
+}
+</script>
+""", unsafe_allow_html=True)
 
 # Page Configuration
 st.set_page_config(
@@ -587,7 +624,7 @@ uploaded_files = st.file_uploader(
 )
 
 # Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["&#128172; Chat", "&#8505; Info & Tech Stack", "&#128220; Logs", "&#128221; Notes"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chat", "🧠 Neuron Simulator", "ℹ Info & Tech Stack", "📜 Logs", "📝 Notes"])
 
 NOTES_CONTENT = """
 <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;'>
@@ -638,11 +675,11 @@ NOTES_CONTENT = """
 </div>
 """
 
-with tab4:
+with tab5:
     st.markdown("### &#128221; Developer Notes & Customization")
     st.html(NOTES_CONTENT)
 
-with tab2:
+with tab3:
     col_info1, col_info2 = st.columns(2)
     
     with col_info1:
@@ -689,7 +726,7 @@ with tab2:
         - `OPENAI_API_KEY` (Fallback)
         """)
 
-with tab3:
+with tab4:
     st.markdown("### &#128220; Application Logs")
     
     # Toolbar
@@ -832,6 +869,300 @@ with tab3:
     log_html += '</div>'
     st.html(log_html)
 
+# ==========================================
+# TAB 2: NEURON SIMULATOR (Post-MVP Feature)
+# ==========================================
+with tab2:
+    st.markdown("### 🧠 Browser-Based Neuron Simulation")
+    st.markdown("Simulate neuron activity directly in your browser. No Python installation required!")
+    
+    # Get Groq API Key
+    try:
+        groq_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+    except Exception:
+        groq_key = os.environ.get("GROQ_API_KEY")
+
+    if not groq_key:
+        st.error("⚠️ Groq API Key not found. Please set it in HF Space secrets.")
+    else:
+        # Template selection
+        st.markdown("#### 📋 Pre-Built Models")
+        template_col1, template_col2 = st.columns(2)
+        
+        with template_col1:
+            if st.button("⚡ Leaky Integrate-and-Fire (LIF)", use_container_width=True):
+                st.session_state['neuron_template'] = "lif"
+                st.session_state['generated_code'] = neuron_simulator.get_template_code("lif")
+        
+        with template_col2:
+            if st.button("🔬 Hodgkin-Huxley Model", use_container_width=True):
+                st.session_state['neuron_template'] = "hodgkin_huxley"
+                st.session_state['generated_code'] = neuron_simulator.get_template_code("hodgkin_huxley")
+        
+        # Display template code if selected
+        if 'generated_code' in st.session_state:
+            st.markdown("#### 💻 Model Code")
+            st.code(st.session_state['generated_code'], language="python")
+            
+            # Run in browser button
+            if st.button("🚀 Run Simulation in Browser", type="primary", use_container_width=True):
+                with st.spinner("⚙️ Preparing simulation..."):
+                    import base64
+                    
+                    # Encode Python code to base64 to avoid JavaScript syntax errors
+                    python_code_base64 = base64.b64encode(
+                        st.session_state['generated_code'].encode('utf-8')
+                    ).decode('utf-8')
+                    
+                    st.info("⏳ First run takes 30-60 seconds to load NumPy and Matplotlib...")
+                    
+                    # Create HTML component with Pyodide loaded INSIDE the iframe
+                    html_code = f"""
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+                        <style>
+                            body {{ font-family: Arial, sans-serif; padding: 20px; background: #1a1a2e; color: #eee; }}
+                            #status {{ padding: 15px; background: #16213e; border-radius: 8px; margin-bottom: 20px; }}
+                            #simulation-result {{ text-align: center; }}
+                            .loading {{ color: #4ec9b0; }}
+                            .error {{ color: #f44747; }}
+                        </style>
+                    </head>
+                    <body>
+                        <div id="status" class="loading">🔄 Initializing Pyodide Python environment...</div>
+                        <div id="simulation-result"></div>
+                        
+                        <script>
+                        async function runSimulation() {{
+                            const statusDiv = document.getElementById('status');
+                            const resultDiv = document.getElementById('simulation-result');
+                            
+                            try {{
+                                statusDiv.innerHTML = '🔄 Loading Pyodide (this may take 30-60 seconds)...';
+                                let pyodide = await loadPyodide();
+                                
+                                statusDiv.innerHTML = '📦 Installing NumPy and Matplotlib...';
+                                await pyodide.loadPackage(["numpy", "matplotlib"]);
+                                
+                                statusDiv.innerHTML = '⚙️ Running neuron simulation...';
+                                
+                                // Setup matplotlib for base64 output
+                                await pyodide.runPythonAsync(`
+                                    import matplotlib
+                                    matplotlib.use('agg')
+                                    import matplotlib.pyplot as plt
+                                    import io
+                                    import base64
+                                    import numpy as np
+                                `);
+                                
+                                // Decode and run the Python code
+                                const pythonCodeBase64 = "{python_code_base64}";
+                                const pythonCode = atob(pythonCodeBase64);
+                                await pyodide.runPythonAsync(pythonCode);
+                                
+                                // Get the plot as base64
+                                let plot_data = await pyodide.runPythonAsync(`
+                                    buf = io.BytesIO()
+                                    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+                                    buf.seek(0)
+                                    import base64
+                                    img_str = base64.b64encode(buf.read()).decode('utf-8')
+                                    img_str
+                                `);
+                                
+                                statusDiv.innerHTML = '✅ Simulation complete!';
+                                statusDiv.style.background = '#1e4620';
+                                
+                                resultDiv.innerHTML = '<img src="data:image/png;base64,' + plot_data + '" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">';
+                                
+                            }} catch (error) {{
+                                statusDiv.innerHTML = '❌ Error: ' + error.message;
+                                statusDiv.className = 'error';
+                                statusDiv.style.background = '#46201e';
+                                console.error(error);
+                            }}
+                        }}
+                        
+                        runSimulation();
+                        </script>
+                    </body>
+                    </html>
+                    """
+                    
+                    st.components.v1.html(html_code, height=800, scrolling=True)
+        
+        # Custom code generation
+        st.markdown("#### 🎯 Custom Neuron Simulation")
+        st.markdown("Describe your simulation needs, and AI will generate custom neuron model code.")
+        
+        # Quick prompts
+        st.markdown("**💡 Quick Prompts:**")
+        prompt_col1, prompt_col2, prompt_col3 = st.columns(3)
+        
+        with prompt_col1:
+            if st.button("Dopamine Modulation", use_container_width=True):
+                st.session_state['neuron_query'] = "Simulate dopamine-modulated synaptic plasticity in prefrontal cortex neurons with increased threshold"
+        
+        with prompt_col2:
+            if st.button("High-Frequency Stimulation", use_container_width=True):
+                st.session_state['neuron_query'] = "Simulate LTP induction with high-frequency stimulation (100Hz) in CA1 hippocampal neurons"
+        
+        with prompt_col3:
+            if st.button("Action Potential Propagation", use_container_width=True):
+                st.session_state['neuron_query'] = "Simulate action potential propagation along axon with myelination effects"
+        
+        # User query
+        user_query = st.text_area(
+            "What neuron simulation do you want?",
+            value=st.session_state.get('neuron_query', ''),
+            height=100,
+            placeholder="e.g., Simulate dopamine-modulated synaptic plasticity in prefrontal cortex neurons..."
+        )
+        
+        # Context from uploaded PDFs
+        context_text = ""
+        if "retriever" in st.session_state:
+            st.info("📚 Context from your uploaded PDFs will be included to make the simulation more relevant.")
+            try:
+                if user_query:
+                    docs = st.session_state["retriever"].invoke(user_query)
+                    context_text = "\n".join([doc.page_content for doc in docs[:3]])
+            except:
+                pass
+        
+        # Generate button
+        if st.button("🚀 Generate Custom Simulation", type="primary", use_container_width=True):
+            if not user_query:
+                st.warning("Please describe your simulation needs.")
+            else:
+                with st.spinner("🧠 AI is generating neuron simulation code..."):
+                    result = neuron_simulator.generate_neuron_code(user_query, context_text, groq_key)
+                    
+                    if result["success"]:
+                        st.success("✅ Simulation code generated!")
+                        
+                        # Clean the code for browser execution
+                        browser_ready_code = result["code"]
+                        
+                        # Remove plt.show() and replace with savefig
+                        browser_ready_code = browser_ready_code.replace('plt.show()', '# plt.show() removed for browser compatibility')
+                        
+                        # Ensure matplotlib backend is set
+                        if 'matplotlib.use' not in browser_ready_code:
+                            browser_ready_code = "import matplotlib\nmatplotlib.use('agg')\n" + browser_ready_code
+                        
+                        st.session_state['generated_code'] = result["code"]
+                        st.session_state['browser_ready_code'] = browser_ready_code
+                        
+                        # Display original code
+                        st.markdown("#### 💻 Generated Code")
+                        st.code(result["code"], language="python")
+                        
+                        # Two buttons: Download + Run in Browser
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.download_button(
+                                label="⬇️ Download Code",
+                                data=result["code"],
+                                file_name="neuron_simulation.py",
+                                mime="text/plain",
+                                use_container_width=True
+                            )
+                        
+                        with col2:
+                            if st.button("🚀 Run in Browser", type="primary", use_container_width=True):
+                                import base64
+                                
+                                # Encode browser-ready code to base64
+                                python_code_base64 = base64.b64encode(
+                                    browser_ready_code.encode('utf-8')
+                                ).decode('utf-8')
+                                
+                                st.info("⏳ Loading Pyodide (30-60 seconds for first run)...")
+                                
+                                # Create HTML component
+                                html_code = f"""
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+                                    <style>
+                                        body {{ font-family: Arial, sans-serif; padding: 20px; background: #1a1a2e; color: #eee; }}
+                                        #status {{ padding: 15px; background: #16213e; border-radius: 8px; margin-bottom: 20px; }}
+                                        #simulation-result {{ text-align: center; }}
+                                        .loading {{ color: #4ec9b0; }}
+                                        .error {{ color: #f44747; }}
+                                    </style>
+                                </head>
+                                <body>
+                                    <div id="status" class="loading">🔄 Initializing...</div>
+                                    <div id="simulation-result"></div>
+                                    
+                                    <script>
+                                    async function runSimulation() {{
+                                        const statusDiv = document.getElementById('status');
+                                        const resultDiv = document.getElementById('simulation-result');
+                                        
+                                        try {{
+                                            statusDiv.innerHTML = '🔄 Loading Pyodide...';
+                                            let pyodide = await loadPyodide();
+                                            
+                                            statusDiv.innerHTML = '📦 Installing packages...';
+                                            await pyodide.loadPackage(["numpy", "matplotlib"]);
+                                            
+                                            statusDiv.innerHTML = '⚙️ Running simulation...';
+                                            
+                                            // Setup matplotlib
+                                            await pyodide.runPythonAsync(`
+                                                import matplotlib
+                                                matplotlib.use('agg')
+                                                import matplotlib.pyplot as plt
+                                                import io
+                                                import base64
+                                                import numpy as np
+                                            `);
+                                            
+                                            // Decode and run code
+                                            const pythonCodeBase64 = "{python_code_base64}";
+                                            const pythonCode = atob(pythonCodeBase64);
+                                            await pyodide.runPythonAsync(pythonCode);
+                                            
+                                            // Get plot
+                                            let plot_data = await pyodide.runPythonAsync(`
+                                                buf = io.BytesIO()
+                                                plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+                                                buf.seek(0)
+                                                import base64
+                                                img_str = base64.b64encode(buf.read()).decode('utf-8')
+                                                img_str
+                                            `);
+                                            
+                                            statusDiv.innerHTML = '✅ Complete!';
+                                            statusDiv.style.background = '#1e4620';
+                                            
+                                            resultDiv.innerHTML = '<img src="data:image/png;base64,' + plot_data + '" style="max-width: 100%; border-radius: 8px;">';
+                                            
+                                        }} catch (error) {{
+                                            statusDiv.innerHTML = '❌ Error: ' + error.message;
+                                            statusDiv.className = 'error';
+                                            statusDiv.style.background = '#46201e';
+                                            console.error(error);
+                                        }}
+                                    }}
+                                    
+                                    runSimulation();
+                                    </script>
+                                </body>
+                                </html>
+                                """
+                                
+                                st.components.v1.html(html_code, height=800, scrolling=True)
+                    else:
+                        st.error(f"❌ Failed to generate code: {result['error']}")
 with tab1:
     if uploaded_files:
         temp_dir = tempfile.mkdtemp(prefix="rag_chatbot_")
