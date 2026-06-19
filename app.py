@@ -117,7 +117,7 @@ async function runPythonCode(code) {
 
 # Page Configuration
 st.set_page_config(
-    page_title="Universal RAG Chatbot",
+    page_title="Autonomous Agent for Neuroscience",
     page_icon=":books:",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -261,7 +261,7 @@ st.markdown("""
     </div>
 </div>
 <div style='text-align: center; padding: 2rem 0 1rem 0;'>
-    <h1 style='font-size: 4rem; margin-bottom: 0;'>&#128218; Universal RAG Chatbot</h1>
+    <h1 style='font-size: 4rem; margin-bottom: 0;'>&#128218;Autonomous Agent for  Neuroscience</h1>
     <p style='font-size: 1.3rem; background: linear-gradient(135deg, #a78bfa 0%, #f472b6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; margin-top: 0.5rem;'>
         &#127919; AI-Powered Document Q&A System
     </p>
@@ -1421,7 +1421,7 @@ st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666; padding: 20px;'>
     <p>Build By NeuroMind AI</p>
-    <p>Universal RAG Chatbot • Built with LangChain, FAISS & Streamlit</p>
+    <p>NeuroMind AI • Built with LangChain, FAISS & Streamlit</p>
     <p>Powered by Groq LLM & HuggingFace Embeddings</p>
 </div>
 """, unsafe_allow_html=True)
